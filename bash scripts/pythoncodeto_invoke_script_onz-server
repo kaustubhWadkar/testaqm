@@ -1,0 +1,60 @@
+import json
+import boto3
+import logging
+
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+def lambda_handler(event, context):
+    """
+    Lambda function to trigger script execution on EC2 instances using SSM Run Command
+    """
+    
+    
+    ssm_client = boto3.client('ssm')
+    
+    try:
+        
+        instance_ids = ['i-00ca56d937e9e33f5']  
+        script_command = [
+            '#!/bin/bash',
+            'cd /root/testaqm',
+            './build.sh',
+            'echo "Script execution completed"'
+        ]
+        
+        
+        response = ssm_client.send_command(
+            InstanceIds=instance_ids,
+            DocumentName='AWS-RunShellScript',  
+            Parameters={
+                'commands': script_command,
+                'workingDirectory': ['/tmp'],
+                'executionTimeout': ['3600']  
+            },
+            Comment='Lambda triggered script execution',
+            TimeoutSeconds=3600
+        )
+        
+        command_id = response['Command']['CommandId']
+        logger.info(f"Command sent successfully. Command ID: {command_id}")
+        
+        return {
+            'statusCode': 200,
+            'body': json.dumps({
+                'message': 'Script execution initiated successfully',
+                'commandId': command_id,
+                'instanceIds': instance_ids
+            })
+        }
+        
+    except Exception as e:
+        logger.error(f"Error executing script: {str(e)}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({
+                'error': 'Failed to execute script',
+                'details': str(e)
+            })
+        }
